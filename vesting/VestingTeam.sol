@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.9;
 
 import "../token/ERC20/IERC20.sol";
 import "../access/Ownable.sol";
@@ -11,7 +11,6 @@ import "../access/Ownable.sol";
  * tokens after a given release time.
  */
 contract DiamondNXTTimeLock is Ownable {
-
     /**
      * @dev ERC20 contract being held = Diamond NXT (DNXT)
      */
@@ -44,8 +43,7 @@ contract DiamondNXTTimeLock is Ownable {
      */
     event AddressesSet(bool set);
 
-
-    constructor () {
+    constructor() {
         DNXT = IERC20(0x0D74b7d0e373bA7E61758B0962f8F321Ac2b8387);
         startDate = block.timestamp;
     }
@@ -55,19 +53,27 @@ contract DiamondNXTTimeLock is Ownable {
      * @return releasePercentage Percentage unlocked now
      */
     function unlocked() public view returns (uint256) {
-        uint256 startRelease = startDate + 365 days;
+        uint256 startRelease = startDate + 456 days;
         uint256 releasePercentage;
-       
-        if (block.timestamp <= startRelease + 91 days) {
+
+        if (block.timestamp <= startRelease) {
             releasePercentage = 0;
-        } else if (block.timestamp < startRelease + 182 days) {
-            releasePercentage = 25;
-        } else if (block.timestamp < startRelease + 274 days) {
-            releasePercentage = 50;
-        } else if (block.timestamp < startRelease + 365 days) {
-            releasePercentage = 75;
-        } else if (block.timestamp >= startRelease + 365 days) {
-            releasePercentage = 100;
+        } else if (block.timestamp <= startRelease + 91 days) {
+            releasePercentage = (1000 * 1) / 8; // 12.5% - Months 15 to 18
+        } else if (block.timestamp <= startRelease + 182 days) {
+            releasePercentage = (1000 * 2) / 8; // 25% - Months 18 to 21
+        } else if (block.timestamp <= startRelease + 274 days) {
+            releasePercentage = (1000 * 3) / 8; // 37.5% - Months 21 to 24
+        } else if (block.timestamp <= startRelease + 365 days) {
+            releasePercentage = (1000 * 4) / 8; // 50% - Months 24 to 27
+        } else if (block.timestamp <= startRelease + 456 days) {
+            releasePercentage = (1000 * 5) / 8; // 62.5% - Months 27 to 30
+        } else if (block.timestamp <= startRelease + 547 days) {
+            releasePercentage = (1000 * 6) / 8; // 75% - Months 30 to 33
+        } else if (block.timestamp <= startRelease + 639 days) {
+            releasePercentage = (1000 * 7) / 8; // 87.5% - Months 33 to 36
+        } else if (block.timestamp > startRelease + 639 days) {
+            releasePercentage = 1000; // 100% - After Month 36
         }
         return releasePercentage;
     }
@@ -93,7 +99,9 @@ contract DiamondNXTTimeLock is Ownable {
      * @dev Determines the number of tokens an address can withdraw, calculated as the difference between the total unlocked tokens and the tokens already claimed.
      * @param account The user address
      */
-    function availableToWithdraw(address account) public view returns (uint256) {
+    function availableToWithdraw(
+        address account
+    ) public view returns (uint256) {
         return unlockedTotal(account) - claimedAmount(account);
     }
 
@@ -102,10 +110,9 @@ contract DiamondNXTTimeLock is Ownable {
      * @param account The user address
      */
     function unlockedTotal(address account) public view returns (uint256) {
-       
-        return userData[account].locked * unlocked() / 100;
+        return (userData[account].locked * unlocked()) / 1000;
     }
-    
+
     /**
      * @dev Retrieves the number of tokens locked for a specific user address.
      * @param account The user address
@@ -113,7 +120,7 @@ contract DiamondNXTTimeLock is Ownable {
     function lockedAmount(address account) public view returns (uint256) {
         return userData[account].locked;
     }
-    
+
     /**
      * @dev Determines the number of tokens already claimed by a specific user address.
      * @param account The user address
@@ -121,7 +128,7 @@ contract DiamondNXTTimeLock is Ownable {
     function claimedAmount(address account) public view returns (uint256) {
         return userData[account].withdrawn;
     }
-    
+
     /**
      * @dev Calculates the number of tokens yet to be claimed by a user address as the difference between locked and withdrawn tokens.
      * @param account The user address
@@ -135,7 +142,10 @@ contract DiamondNXTTimeLock is Ownable {
      * @param accounts Array of user addresses
      * @param amounts Array of user amounts
      */
-    function setlockedAmounts(address[] memory accounts, uint256[] memory amounts) public onlyOwner {
+    function setlockedAmounts(
+        address[] memory accounts,
+        uint256[] memory amounts
+    ) public onlyOwner {
         require(set == false, "Already set");
         set = true;
         for (uint256 i = 0; i < accounts.length; i++) {
