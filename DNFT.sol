@@ -10,6 +10,7 @@ import "./access/AccessControl.sol";
 import "./token/ERC721/extensions/ERC721Burnable.sol";
 import "./utils/Counters.sol";
 import "./WhitelistVerifier.sol";
+import "./token/common/ERC2981.sol";
 
 contract DNFT is
     ERC721,
@@ -19,35 +20,41 @@ contract DNFT is
     Ownable,
     AccessControl,
     ERC721Burnable,
-    WhitelistVerifier
+    WhitelistVerifier,
+    ERC2981
 {
     using Counters for Counters.Counter;
     using Strings for uint256;
 
     // File extension for metadata file
-    string private extension;
-    string private baseURI;
+    string public extension;
+    string public baseURI;
 
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant BURNER_ROLE = keccak256("BURNER_ROLE");
+    bytes32 public constant ROYALTIES_ROLE = keccak256("ROYALTIES_ROLE");
+    bytes32 public constant ATTRIBUTE_ROLE = keccak256("ATTRIBUTE_ROLE");
 
     Counters.Counter private _tokenIdCounter;
 
     struct Diamond {
-        string lab;
-        string certificateNumber;
-        string shape;
-        uint256 caratWeight;
-        string color;
-        string clarity;
         string cut;
-        string polish;
+        string clarity;
+        string color;
+        uint256 caratWeight;
+        string shape;
         string symmetry;
         string fluorescence;
+        string polish;
+        string certificateIssuer;
+        string certificateNumber;
     }
 
     mapping(uint256 => Diamond) public diamonds;
+
+    event DefaultRoyaltySet(address indexed receiver, uint96 feeNumerator);
+    event TokenRoyaltySet(uint256 indexed tokenId, address indexed receiver, uint96 feeNumerator);
 
     constructor()
         ERC721("Diamond NFT", "DNFT")
@@ -57,6 +64,9 @@ contract DNFT is
         _grantRole(PAUSER_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
         _grantRole(BURNER_ROLE, msg.sender);
+        _grantRole(ROYALTIES_ROLE, msg.sender);
+        _grantRole(ATTRIBUTE_ROLE, msg.sender);
+        setDefaultRoyalty(msg.sender, 1000);
         baseURI = "https://dnxt.app/json/";
         extension = ".json";
         verificationActive = false;
@@ -101,105 +111,87 @@ contract DNFT is
     /**
      * @dev Mints a new token and sets the diamond information.
      * @param to The address to mint the token to.
-     * @param lab The lab that certified the diamond.
-     * @param certificateNumber The certificate number from the lab.
-     * @param shape The shape of the diamond.
-     * @param caratWeight The weight of the diamond in carats.
-     * @param color The color grade of the diamond.
-     * @param clarity The clarity grade of the diamond.
      * @param cut The cut grade of the diamond.
-     * @param polish The polish grade of the diamond.
+     * @param clarity The clarity grade of the diamond.
+     * @param color The color grade of the diamond.
+     * @param caratWeight The weight of the diamond in carats.
+     * @param shape The shape of the diamond.
      * @param symmetry The symmetry grade of the diamond.
      * @param fluorescence The fluorescence grade of the diamond.
+     * @param polish The polish grade of the diamond.
+     * @param certificateIssuer The certificate issuer of the diamond.
+     * @param certificateNumber The certificate number from the certificate issuer.
      */
     function safeMintWithDiamondInfo(
         address to,
-        string memory lab,
-        string memory certificateNumber,
-        string memory shape,
-        uint256 caratWeight,
-        string memory color,
-        string memory clarity,
         string memory cut,
-        string memory polish,
+        string memory clarity,
+        string memory color,
+        uint256 caratWeight,
+        string memory shape,
         string memory symmetry,
-        string memory fluorescence
+        string memory fluorescence,
+        string memory polish,
+        string memory certificateIssuer,
+        string memory certificateNumber
     ) public onlyRole(MINTER_ROLE) {
-        uint256 tokenId = _tokenIdCounter.current();
         _tokenIdCounter.increment();
+        uint256 tokenId = _tokenIdCounter.current();
         _safeMint(to, tokenId);
-        Diamond storage diamond = diamonds[tokenId];
-        diamond.lab = lab;
-        diamond.certificateNumber = certificateNumber;
-        diamond.shape = shape;
-        diamond.caratWeight = caratWeight;
-        diamond.color = color;
-        diamond.clarity = clarity;
-        diamond.cut = cut;
-        diamond.polish = polish;
-        diamond.symmetry = symmetry;
-        diamond.fluorescence = fluorescence;
+
+        setDiamondAttributes(
+            tokenId,
+            cut,
+            clarity,
+            color,
+            caratWeight,
+            shape,
+            symmetry,
+            fluorescence,
+            polish,
+            certificateIssuer,
+            certificateNumber
+        );
     }
 
     /**
      * @dev Sets the diamond attributes for a specific token ID.
-     * Can only be called internally.
      * @param tokenId The token ID to set the attributes for.
-     * @param lab The lab that certified the diamond.
-     * @param certificateNumber The certificate number from the lab.
-     * @param shape The shape of the diamond.
-     * @param caratWeight The weight of the diamond in carats.
-     * @param color The color grade of the diamond.
-     * @param clarity The clarity grade of the diamond.
      * @param cut The cut grade of the diamond.
-     * @param polish The polish grade of the diamond.
+     * @param clarity The clarity grade of the diamond.
+     * @param color The color grade of the diamond.
+     * @param caratWeight The weight of the diamond in carats.
+     * @param shape The shape of the diamond.
      * @param symmetry The symmetry grade of the diamond.
      * @param fluorescence The fluorescence grade of the diamond.
+     * @param polish The polish grade of the diamond.
+     * @param certificateIssuer The certificate issuer of the diamond.
+     * @param certificateNumber The certificate number from the certificate issuer.
      */
     function setDiamondAttributes(
         uint256 tokenId,
-        string memory lab,
-        string memory certificateNumber,
-        string memory shape,
-        uint256 caratWeight,
-        string memory color,
-        string memory clarity,
         string memory cut,
-        string memory polish,
+        string memory clarity,
+        string memory color,
+        uint256 caratWeight,
+        string memory shape,
         string memory symmetry,
-        string memory fluorescence
-    ) internal {
+        string memory fluorescence,
+        string memory polish,
+        string memory certificateIssuer,
+        string memory certificateNumber
+    ) public onlyRole(ATTRIBUTE_ROLE) {
         Diamond storage diamond = diamonds[tokenId];
-        if (bytes(diamond.lab).length == 0) {
-            diamond.lab = lab;
-        }
-        if (bytes(diamond.certificateNumber).length == 0) {
-            diamond.certificateNumber = certificateNumber;
-        }
-        if (bytes(diamond.shape).length == 0) {
-            diamond.shape = shape;
-        }
-        if (diamond.caratWeight == 0) {
-            diamond.caratWeight = caratWeight;
-        }
-        if (bytes(diamond.color).length == 0) {
-            diamond.color = color;
-        }
-        if (bytes(diamond.clarity).length == 0) {
-            diamond.clarity = clarity;
-        }
-        if (bytes(diamond.cut).length == 0) {
-            diamond.cut = cut;
-        }
-        if (bytes(diamond.polish).length == 0) {
-            diamond.polish = polish;
-        }
-        if (bytes(diamond.symmetry).length == 0) {
-            diamond.symmetry = symmetry;
-        }
-        if (bytes(diamond.fluorescence).length == 0) {
-            diamond.fluorescence = fluorescence;
-        }
+        diamond.cut = cut;
+        diamond.clarity = clarity;
+        diamond.color = color;
+        diamond.caratWeight = caratWeight;
+        diamond.shape = shape;
+        diamond.symmetry = symmetry;
+        diamond.fluorescence = fluorescence;
+        diamond.polish = polish;
+        diamond.certificateIssuer = certificateIssuer;
+        diamond.certificateNumber = certificateNumber;
     }
 
     function safeMint(address to) public onlyRole(MINTER_ROLE) {
@@ -240,11 +232,16 @@ contract DNFT is
         super._afterTokenTransfer(from, to, tokenId, batchSize);
     }
 
+    /**
+     * @dev See {ERC721-_burn}. This override additionally clears the royalty information for the token.
+     */
     function _burn(uint256 tokenId)
         internal
+        virtual
         override(ERC721, ERC721URIStorage)
     {
         super._burn(tokenId);
+        _resetTokenRoyalty(tokenId);
     }
 
     function tokenURI(uint256 tokenId)
@@ -270,9 +267,26 @@ contract DNFT is
     function supportsInterface(bytes4 interfaceId)
         public
         view
-        override(ERC721, ERC721Enumerable, AccessControl)
+        override(ERC721, ERC2981, ERC721Enumerable, AccessControl)
         returns (bool)
     {
         return super.supportsInterface(interfaceId);
+    }
+
+    function setDefaultRoyalty(address receiver, uint96 feeNumerator)
+        public
+        onlyRole(ROYALTIES_ROLE)
+    {
+        _setDefaultRoyalty(receiver, feeNumerator);
+        emit DefaultRoyaltySet(receiver, feeNumerator);
+    }
+
+    function setTokenRoyalty(
+        uint256 tokenId,
+        address receiver,
+        uint96 feeNumerator
+    ) public onlyRole(ROYALTIES_ROLE) {
+        _setTokenRoyalty(tokenId, receiver, feeNumerator);
+        emit TokenRoyaltySet(tokenId, receiver, feeNumerator);
     }
 }
