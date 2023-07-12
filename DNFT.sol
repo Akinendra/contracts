@@ -181,6 +181,10 @@ contract DNFT is
         string memory certificateIssuer,
         string memory certificateNumber
     ) public onlyRole(ATTRIBUTE_ROLE) {
+        require(
+            _exists(tokenId),
+            "Setting attributes for nonexistent token"
+        );
         Diamond storage diamond = diamonds[tokenId];
         diamond.cut = cut;
         diamond.clarity = clarity;
