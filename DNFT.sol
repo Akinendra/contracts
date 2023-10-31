@@ -36,7 +36,12 @@ contract DNFT is
     bytes32 public constant ROYALTIES_ROLE = keccak256("ROYALTIES_ROLE");
     bytes32 public constant ATTRIBUTE_ROLE = keccak256("ATTRIBUTE_ROLE");
 
-    Counters.Counter private _tokenIdCounter;
+    Counters.Counter public _tokenIdCounter;
+
+    struct Certificate {
+        string issuer;
+        string number;
+    }
 
     struct Diamond {
         string cut;
@@ -47,14 +52,21 @@ contract DNFT is
         string symmetry;
         string fluorescence;
         string polish;
-        string certificateIssuer;
-        string certificateNumber;
+        Certificate[] certificates;
     }
 
-    mapping(uint256 => Diamond) public diamonds;
+    mapping(uint256 => Diamond) private diamonds;
+    mapping(uint256 => bool) private locked;
 
     event DefaultRoyaltySet(address indexed receiver, uint96 feeNumerator);
-    event TokenRoyaltySet(uint256 indexed tokenId, address indexed receiver, uint96 feeNumerator);
+    event TokenRoyaltySet(
+        uint256 indexed tokenId,
+        address indexed receiver,
+        uint96 feeNumerator
+    );
+
+    event Locked(uint256 tokenId);
+    event Unlocked(uint256 tokenId);
 
     constructor()
         ERC721("Diamond NFT", "DNFT")
@@ -108,6 +120,18 @@ contract DNFT is
         _unpause();
     }
 
+    function lock(uint256 tokenId) public onlyRole(PAUSER_ROLE) {
+        require(_exists(tokenId), "Token ID does not exist");
+        locked[tokenId] = true;
+        emit Locked(tokenId);
+    }
+
+    function unlock(uint256 tokenId) public onlyRole(PAUSER_ROLE) {
+        require(_exists(tokenId), "Token ID does not exist");
+        locked[tokenId] = false;
+        emit Unlocked(tokenId);
+    }
+
     /**
      * @dev Mints a new token and sets the diamond information.
      * @param to The address to mint the token to.
@@ -119,8 +143,7 @@ contract DNFT is
      * @param symmetry The symmetry grade of the diamond.
      * @param fluorescence The fluorescence grade of the diamond.
      * @param polish The polish grade of the diamond.
-     * @param certificateIssuer The certificate issuer of the diamond.
-     * @param certificateNumber The certificate number from the certificate issuer.
+     * @param certs Array of Certificate structs.
      */
     function safeMintWithDiamondInfo(
         address to,
@@ -132,8 +155,7 @@ contract DNFT is
         string memory symmetry,
         string memory fluorescence,
         string memory polish,
-        string memory certificateIssuer,
-        string memory certificateNumber
+        Certificate[] memory certs
     ) public onlyRole(MINTER_ROLE) {
         _tokenIdCounter.increment();
         uint256 tokenId = _tokenIdCounter.current();
@@ -149,8 +171,7 @@ contract DNFT is
             symmetry,
             fluorescence,
             polish,
-            certificateIssuer,
-            certificateNumber
+            certs
         );
     }
 
@@ -165,8 +186,7 @@ contract DNFT is
      * @param symmetry The symmetry grade of the diamond.
      * @param fluorescence The fluorescence grade of the diamond.
      * @param polish The polish grade of the diamond.
-     * @param certificateIssuer The certificate issuer of the diamond.
-     * @param certificateNumber The certificate number from the certificate issuer.
+     * @param certs Array of Certificate structs.
      */
     function setDiamondAttributes(
         uint256 tokenId,
@@ -178,13 +198,9 @@ contract DNFT is
         string memory symmetry,
         string memory fluorescence,
         string memory polish,
-        string memory certificateIssuer,
-        string memory certificateNumber
+        Certificate[] memory certs
     ) public onlyRole(ATTRIBUTE_ROLE) {
-        require(
-            _exists(tokenId),
-            "Setting attributes for nonexistent token"
-        );
+        require(_exists(tokenId), "Setting attributes for nonexistent token");
         Diamond storage diamond = diamonds[tokenId];
         diamond.cut = cut;
         diamond.clarity = clarity;
@@ -194,8 +210,9 @@ contract DNFT is
         diamond.symmetry = symmetry;
         diamond.fluorescence = fluorescence;
         diamond.polish = polish;
-        diamond.certificateIssuer = certificateIssuer;
-        diamond.certificateNumber = certificateNumber;
+        for (uint256 i = 0; i < certs.length; i++) {
+            diamond.certificates.push(certs[i]);
+        }
     }
 
     function safeMint(address to) public onlyRole(MINTER_ROLE) {
@@ -221,6 +238,7 @@ contract DNFT is
         uint256 tokenId,
         uint256 batchSize
     ) internal override(ERC721, ERC721Enumerable) whenNotPaused {
+        require(!locked[tokenId], "Token ID is locked");
         verifyAccounts(from, to);
         super._beforeTokenTransfer(from, to, tokenId, batchSize);
     }
@@ -248,6 +266,7 @@ contract DNFT is
         _resetTokenRoyalty(tokenId);
     }
 
+    
     function tokenURI(uint256 tokenId)
         public
         view
@@ -293,4 +312,30 @@ contract DNFT is
         _setTokenRoyalty(tokenId, receiver, feeNumerator);
         emit TokenRoyaltySet(tokenId, receiver, feeNumerator);
     }
+
+    function getCertificatesForDiamond(uint256 tokenId)
+        public
+        view
+        returns (Certificate[] memory)
+    {
+        return diamonds[tokenId].certificates;
+    }
+
+    function addCertificateToDiamond(
+        uint256 tokenId,
+        string memory issuer,
+        string memory number
+    ) public onlyRole(ATTRIBUTE_ROLE) {
+        Certificate memory newCert = Certificate({
+            issuer: issuer,
+            number: number
+        });
+        diamonds[tokenId].certificates.push(newCert);
+    }
+
+    function getDiamond(uint256 tokenId) public view returns (Diamond memory) {
+        require(_exists(tokenId), "Token ID does not exist");
+        return diamonds[tokenId];
+    }
+
 }
