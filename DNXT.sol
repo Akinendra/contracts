@@ -7,8 +7,7 @@ import "./security/Pausable.sol";
 import "./access/AccessControl.sol";
 import "./token/ERC20/extensions/draft-ERC20Permit.sol";
 import "./token/ERC20/extensions/ERC20Votes.sol";
-import "./WhitelistVerifier.sol";
-import "./Whitelist.sol";
+import "./Compliance.sol";
 
 contract DNXT is
     ERC20,
@@ -17,16 +16,16 @@ contract DNXT is
     AccessControl,
     ERC20Permit,
     ERC20Votes,
-    WhitelistVerifier
+    Compliance
 {
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
 
     constructor(
-        address _whitelist
+        IComplianceRegistry _complianceRegistry
     )
         ERC20("Diamond NXT", "DNXT")
         ERC20Permit("Diamond NXT")
-        WhitelistVerifier(_whitelist)
+        Compliance(_complianceRegistry)
     {
         _grantRole(DEFAULT_ADMIN_ROLE, 0x76162c23689533723Deee2624707a051418d3A6c);
         _grantRole(PAUSER_ROLE, 0x76162c23689533723Deee2624707a051418d3A6c);
@@ -64,7 +63,7 @@ contract DNXT is
         address to,
         uint256 amount
     ) internal override(ERC20) whenNotPaused {
-        verifyAccounts(from, to);
+        compliantERC20Transfer(from, to, amount, address(this));
         super._beforeTokenTransfer(from, to, amount);
     }
 

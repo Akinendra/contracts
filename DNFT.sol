@@ -9,7 +9,7 @@ import "./access/Ownable.sol";
 import "./access/AccessControl.sol";
 import "./token/ERC721/extensions/ERC721Burnable.sol";
 import "./utils/Counters.sol";
-import "./WhitelistVerifier.sol";
+import "./Compliance.sol";
 import "./token/common/ERC2981.sol";
 
 contract DNFT is
@@ -20,7 +20,7 @@ contract DNFT is
     Ownable,
     AccessControl,
     ERC721Burnable,
-    WhitelistVerifier,
+    Compliance,
     ERC2981
 {
     using Counters for Counters.Counter;
@@ -68,9 +68,9 @@ contract DNFT is
     event Locked(uint256 tokenId);
     event Unlocked(uint256 tokenId);
 
-    constructor()
+    constructor(IComplianceRegistry _complianceRegistry)
         ERC721("Diamond NFT", "DNFT")
-        WhitelistVerifier(0x7C8b65CA927BBdbaf31026eddEa7B8226988b1eb)
+        Compliance(_complianceRegistry)
     {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(PAUSER_ROLE, msg.sender);
@@ -81,7 +81,6 @@ contract DNFT is
         setDefaultRoyalty(msg.sender, 1000);
         baseURI = "https://dnxt.app/json/";
         extension = ".json";
-        verificationActive = false;
     }
 
     function _baseURI() internal view override returns (string memory) {
@@ -239,7 +238,7 @@ contract DNFT is
         uint256 batchSize
     ) internal override(ERC721, ERC721Enumerable) whenNotPaused {
         require(!locked[tokenId], "Token ID is locked");
-        verifyAccounts(from, to);
+        compliantERC721Transfer(from, to, tokenId, address(this));
         super._beforeTokenTransfer(from, to, tokenId, batchSize);
     }
 
