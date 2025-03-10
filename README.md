@@ -1,4 +1,3 @@
-
 # DNXT Smart Contract Suite
 
 A comprehensive suite of Ethereum-based smart contracts implementing ERC20 and ERC721 tokens with advanced compliance, access control, and vesting capabilities. This project focuses on creating a regulatory-compliant token ecosystem for tokenized diamond assets.
@@ -15,11 +14,10 @@ A comprehensive suite of Ethereum-based smart contracts implementing ERC20 and E
 ├── token/                   # Base token implementations (ERC20, ERC721)
 ├── security/                # Security-related contracts
 ├── utils/                   # Utility functions and helpers
-└── vesting/                 # Token vesting implementations
+└── vesting/                 # Vesting contracts for token allocations
 ```
 
 ## Key Components
-
 ### DNXT Token (ERC20)
 The DNXT token (`DNXT.sol`) is an ERC20-compatible token with additional functionalities:
 - **Pausable operations**: Allows authorized roles to pause token transfers during emergencies
@@ -142,14 +140,14 @@ struct Diamond {
 }
 ```
 
-## Setup and Deployment on Polygon Testnet
+## Setup and Deployment on Ethereum Sepolia Testnet
 
 ### Prerequisites
 - Solidity ^0.8.9
 - Hardhat or Truffle for deployment
 - OpenZeppelin libraries
-- MetaMask with Mumbai testnet configured
-- MATIC tokens for the Mumbai testnet (from [faucet.polygon.technology](https://faucet.polygon.technology/))
+- MetaMask with Sepolia testnet configured
+- ETH tokens for the Sepolia testnet (from [Sepolia Faucet](https://sepoliafaucet.com/))
 
 ### Deployment Steps
 
@@ -161,7 +159,7 @@ struct Diamond {
    npx hardhat init
    ```
 
-2. **Configure Hardhat for Polygon Mumbai**
+2. **Configure Hardhat for Ethereum Sepolia**
 
    Update `hardhat.config.js`:
    ```javascript
@@ -171,11 +169,10 @@ struct Diamond {
    module.exports = {
      solidity: "0.8.9",
      networks: {
-       mumbai: {
-         url: "https://rpc-mumbai.maticvigil.com",
+       sepolia: {
+         url: "https://sepolia.infura.io/v3/YOUR_INFURA_PROJECT_ID",
          accounts: [process.env.PRIVATE_KEY],
-         chainId: 80001,
-         gasPrice: 8000000000
+         chainId: 11155111
        }
      }
    };
@@ -192,28 +189,28 @@ struct Diamond {
      const whitelist = await Whitelist.deploy(admin, admin);
      await whitelist.deployed();
      console.log("Whitelist deployed to:", whitelist.address);
-     
+
      // Deploy Compliance Registry (IComplianceRegistry implementation)
      // Note: This would require an actual implementation of the compliance registry
-     
+
      // For this example, assume complianceRegistry is deployed at:
      const complianceRegistryAddress = "0x..."; 
-     
+
      // Deploy DNXT
      const DNXT = await ethers.getContractFactory("DNXT");
      const dnxt = await DNXT.deploy(complianceRegistryAddress);
      await dnxt.deployed();
      console.log("DNXT deployed to:", dnxt.address);
-     
+
      // Deploy DNFT
      const DNFT = await ethers.getContractFactory("DNFT");
      const dnft = await DNFT.deploy(complianceRegistryAddress);
      await dnft.deployed();
      console.log("DNFT deployed to:", dnft.address);
-     
+
      // Deploy Vesting contracts if needed
    }
-   
+
    main()
      .then(() => process.exit(0))
      .catch((error) => {
@@ -222,17 +219,17 @@ struct Diamond {
      });
    ```
 
-4. **Deploy to Polygon Mumbai Testnet**
+4. **Deploy to Ethereum Sepolia Testnet**
 
    ```bash
-   npx hardhat run scripts/deploy.js --network mumbai
+   npx hardhat run scripts/deploy.js --network sepolia
    ```
 
-5. **Verify on Polygonscan**
+5. **Verify on Etherscan**
 
-   After deployment, verify your contracts on Polygonscan for transparency:
+   After deployment, verify your contracts on Etherscan for transparency:
    ```bash
-   npx hardhat verify --network mumbai <CONTRACT_ADDRESS> <CONSTRUCTOR_ARGS>
+   npx hardhat verify --network sepolia <CONTRACT_ADDRESS> <CONSTRUCTOR_ARGS>
    ```
 
 ### Interacting with Deployed Contracts
@@ -242,7 +239,7 @@ Once deployed, you can interact with your contracts through:
 1. **MetaMask + Web Interface**: Build a frontend to interact with your contracts
 2. **Hardhat Console**: Use the Hardhat console for direct interaction
    ```bash
-   npx hardhat console --network mumbai
+   npx hardhat console --network sepolia
    ```
    Example interactions:
    ```javascript
@@ -276,10 +273,4 @@ npx hardhat test
 - [OpenZeppelin Contracts](https://github.com/OpenZeppelin/openzeppelin-contracts) - Used for standard implementations of ERC20, ERC721, AccessControl, etc.
 - [EIP-2612: Permit Extension for ERC20](https://eips.ethereum.org/EIPS/eip-2612)
 - [EIP-2981: NFT Royalty Standard](https://eips.ethereum.org/EIPS/eip-2981)
-- [Polygon Documentation](https://docs.polygon.technology/)
-
-## License
-MIT
-
-## Contact
-[Your contact information]
+- [Ethereum Sepolia Documentation](https://sepolia.dev/)
